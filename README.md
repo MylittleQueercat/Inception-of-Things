@@ -2,14 +2,11 @@
 
 This project is part of 42's outer-circle curriculum, completed by hguo and vgoret.
 
-A 42 school project exploring Kubernetes fundamentals through two
-exercises. Vagrant manages the virtual machines for both parts. P1 creates
-a two-node K3s cluster; P2 creates a single-node K3s cluster and routes
-traffic to three web apps through one Ingress.
+A 42 school project exploring Kubernetes fundamentals. Vagrant manages
+the virtual machines for Part 1, which creates a two-node K3s cluster.
 
 ```
 p1/      hguo: 2 node K3s cluster
-p2/      hguo: 1 node K3s cluster, 3 apps behind an Ingress
 ```
 
 ## Host prerequisites
@@ -105,64 +102,4 @@ To remove the VMs and their data, run this from the host in `p1/`:
 vagrant destroy -f
 ```
 
-## Part 2 (hguo): K3s and three simple applications
-
-One VM, `hguoS` at `192.168.56.110`, runs K3s in server mode and hosts
-all three nginx apps. An Ingress routes requests with the `app1.com` Host
-header to app1 and `app2.com` to app2; requests with any other Host header
-go to app3. The app2 Deployment has three replicas, and its Service routes
-traffic to those pods.
-
-During `vagrant up`, Vagrant installs K3s, copies the Kubernetes manifest
-files from `p2/confs` into the VM, waits for the node to become `Ready`,
-then applies the manifests to create the apps and Ingress.
-
-```
-p2/
-├── Vagrantfile
-├── scripts/
-│   ├── install_k3s.sh
-│   └── deploy_apps.sh
-└── confs/
-    ├── app1.yaml
-    ├── app2.yaml
-    ├── app3.yaml
-    └── ingress.yaml
-```
-
-```bash
-cd p2
-vagrant up
-```
-
-Enter the VM and check the resources and routes. The `curl` commands set
-the HTTP `Host` header so the Ingress can choose the matching app; a request
-without an explicit Host header is routed to app3.
-
-```bash
-vagrant ssh hguoS
-kubectl get all
-curl -H "Host: app1.com" 192.168.56.110
-curl -H "Host: app2.com" 192.168.56.110
-curl 192.168.56.110
-
-kubectl get ingress
-kubectl describe ingress
-
-# Inspect these resources if a request does not return the expected page.
-kubectl get deployments,pods,services,ingress
-exit
-```
-
-Run Vagrant lifecycle commands from the host, in `p2/`:
-
-```bash
-vagrant halt
-```
-
-To remove the VM and its data, run this from the host in `p2/`:
-
-```bash
-vagrant destroy -f
-```
 
