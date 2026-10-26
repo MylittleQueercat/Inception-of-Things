@@ -1,12 +1,11 @@
-# Stock nginx image, only the page content differs between app1/app2/app3 --
-# this ConfigMap overrides nginx's default index.html.
+# ConfigMap stores the page content separately from the nginx image.
+# The Deployment below mounts index.html into nginx's web directory.
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: app1-html # referenced below by the Deployment's volumes.configMap.name
+  name: app1-html
 data:
-  # Key becomes the mounted file name (index.html) once this ConfigMap is
-  # mounted as a volume -- nginx serves it as-is from its docroot.
+  # The ConfigMap key becomes a file named index.html when mounted.
   index.html: |
     <html>
       <body>
@@ -19,41 +18,46 @@ kind: Deployment
 metadata:
   name: app1
 spec:
-  replicas: 1 # how many identical pods to keep running
+  # Kubernetes keeps this many identical app1 Pods running.
+  replicas: 1
   selector:
-    # tells the Deployment which pods it owns/manages -- must match
-    # template.metadata.labels below, or the Deployment can't find its pods
+    # The Deployment manages Pods with this label. It must match the label
+    # in template.metadata.labels below.
     matchLabels:
       app: app1
-  template: # pod template: stamped out `replicas` times
+  # Kubernetes uses this template to create each app1 Pod.
+  template:
     metadata:
       labels:
-        app: app1 # matched by selector above, and by the Service's selector
+        # The Deployment selector and the Service both use this label to find
+        # the app1 Pod.
+        app: app1
     spec:
       containers:
         - name: nginx
-          image: nginx:alpine # official image, unmodified
+          image: nginx:alpine
           ports:
-            - containerPort: 80 # nginx's default listen port
+            # nginx listens on port 80 inside the container.
+            - containerPort: 80
           volumeMounts:
-            # overlay the ConfigMap's index.html onto nginx's docroot,
-            # replacing the image's built-in default page
+            # Mount the ConfigMap-provided page over nginx's default web directory.
             - name: html
               mountPath: /usr/share/nginx/html
       volumes:
-        - name: html # must match volumeMounts[].name above
+        - name: html
           configMap:
-            name: app1-html # the ConfigMap defined at the top of this file
+            # This name refers to the ConfigMap defined at the top of this file.
+            name: app1-html
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: app1 # this is the DNS name/backend name the Ingress routes to
+  name: app1
 spec:
-  # routes traffic to any pod whose labels match this -- i.e. the pods
-  # created by the app1 Deployment above
+  # Forward traffic to Pods carrying the app: app1 label.
   selector:
     app: app1
   ports:
-    - port: 80 # port the Service itself listens on (used by the Ingress)
-      targetPort: 80 # port forwarded to on the pod (containerPort above)
+    # The Service listens on port 80 and forwards to port 80 in each Pod.
+    - port: 80
+      targetPort: 80

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# if fail, exit immediately
 set -euo pipefail
 
 # The generic/ubuntu2204 box ships with DNSSEC=yes in systemd-resolved, which
@@ -7,14 +8,14 @@ set -euo pipefail
 sed -i 's/^DNSSEC=.*/DNSSEC=no/' /etc/systemd/resolved.conf
 systemctl restart systemd-resolved
 
-# Find the NIC that owns NODE_IP (the private_network interface), so flannel
-# uses that link instead of the NAT/default interface.
+# A VM can have multiple NICs: NAT for internet access and a private NIC for
+# communication between the server and agent. Find the private NIC assigned
+# NODE_IP, then make Flannel use it for cluster traffic.
 IFACE=$(ip -4 -o addr show | awk -v ip="$NODE_IP" '$4 ~ "^"ip"/" {print $2; exit}')
 
-# Install k3s as a server (control plane). Piping the official installer
-# script into sh is the standard k3s install method.
-# INSTALL_K3S_VERSION pins an exact release instead of relying on the
-# "stable" channel lookup at update.k3s.io, which has been returning 404s.
+# Download and run the official K3s installer, configuring this machine as
+# the cluster server (control plane). Pin the version so the installer does
+# not need to look up the moving "stable" release channel, which can fail.
 curl -sSfL https://get.k3s.io | K3S_TOKEN="$K3S_TOKEN" \
 	INSTALL_K3S_VERSION="v1.36.3+k3s1" \
 	INSTALL_K3S_EXEC="server \
@@ -25,8 +26,8 @@ curl -sSfL https://get.k3s.io | K3S_TOKEN="$K3S_TOKEN" \
 		--write-kubeconfig-mode=644" \
 	sh -
 
-# k3s's installer already provides a working `kubectl` (symlinked to the k3s
-# binary, defaults to /etc/rancher/k3s/k3s.yaml) -- that satisfies "install kubectl".
+# The K3s installer also makes `kubectl` available on this VM. By default,
+# kubectl reads the cluster connection settings from this kubeconfig file.
 {
 	echo "export KUBECONFIG=/etc/rancher/k3s/k3s.yaml"
 	echo "alias k=kubectl"

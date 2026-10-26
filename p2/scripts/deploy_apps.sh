@@ -1,10 +1,10 @@
+#!/usr/bin/env bash
+set -eu
 
 # Wait for the K3s node to become ready, then deploy the Kubernetes
 # resources (Deployments, Services, and Ingress) from the confs directory.
 
-#!/usr/bin/env bash
-set -eu
-
+# Tell kubectl to use this file to connect to the K3s cluster.
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 # k3s starts the API server asynchronously; wait for the node to report

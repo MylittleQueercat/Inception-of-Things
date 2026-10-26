@@ -3,9 +3,9 @@
 This project is part of 42's outer-circle curriculum, completed by hguo and vgoret.
 
 A 42 school project exploring Kubernetes fundamentals through two
-exercises, both run inside Vagrant managed VMs. P1 focuses on bringing
-up a small multi-node K3s cluster; P2 builds on that foundation with
-three web apps routed through one Ingress.
+exercises. Vagrant manages the virtual machines for both parts. P1 creates
+a two-node K3s cluster; P2 creates a single-node K3s cluster and routes
+traffic to three web apps through one Ingress.
 
 ```
 p1/      hguo: 2 node K3s cluster
@@ -51,11 +51,11 @@ vagrant --version
 
 ## Part 1 (hguo): K3s and Vagrant
 
-Two VMs, `hguoS` as the K3s server at `192.168.56.110` and
-`hguoSW` as the K3s agent at `192.168.56.111`, joined into one
-cluster. The server hosts the Kubernetes control plane, while the agent
-joins it as a worker node. Both VMs use Ubuntu 22.04 and receive their
-K3s configuration from the provisioning scripts.
+This part creates two VMs and joins them to one cluster: `hguoS` is the
+K3s server at `192.168.56.110`, and `hguoSW` is the K3s agent at
+`192.168.56.111`. The server runs the Kubernetes control plane; the agent
+joins it as a worker node. Both VMs use Ubuntu 22.04 and are configured by
+their respective provisioning scripts.
 
 ```
 p1/
@@ -68,35 +68,54 @@ p1/
 ```bash
 cd p1
 vagrant up
-# Run these checks from the host in separate SSH sessions as needed.
+```
+
+Run the following from the host to enter each VM. The service checks run
+inside the VM named in the preceding SSH command; run `exit` before opening
+the other VM's SSH session.
+
+```bash
 vagrant ssh hguoS
-# inside the VM:
 sudo systemctl status k3s
 kubectl get nodes -o wide
+exit
 
 vagrant ssh hguoSW
-# inside the VM:
 sudo systemctl status k3s-agent
+exit
+```
 
-# On the server, both nodes should appear with Ready status.
+On `hguoS`, `kubectl get nodes` should list both nodes with `Ready` status:
+
+```bash
+vagrant ssh hguoS
 kubectl get nodes
+exit
+```
 
+Run Vagrant lifecycle commands from the host, in `p1/` (not inside a VM):
+
+```bash
 vagrant halt
+```
+
+To remove the VMs and their data, run this from the host in `p1/`:
+
+```bash
 vagrant destroy -f
 ```
 
 ## Part 2 (hguo): K3s and three simple applications
 
-One VM, `hguoS` at `192.168.56.110`, runs K3s in single-node server
-mode and deploys three nginx apps behind an Ingress. Requests with
-the `app1.com` or `app2.com` Host header go to their matching apps;
-other requests fall through to `app3`. `app2` runs three replicas to
-demonstrate scaling a Deployment, and the Ingress distributes matching
-requests across its pods.
+One VM, `hguoS` at `192.168.56.110`, runs K3s in server mode and hosts
+all three nginx apps. An Ingress routes requests with the `app1.com` Host
+header to app1 and `app2.com` to app2; requests with any other Host header
+go to app3. The app2 Deployment has three replicas, and its Service routes
+traffic to those pods.
 
-The Vagrant provisioning installs K3s, copies the Kubernetes manifests
-into the VM, waits for the node to become Ready, and applies the apps
-and Ingress automatically.
+During `vagrant up`, Vagrant installs K3s, copies the Kubernetes manifest
+files from `p2/confs` into the VM, waits for the node to become `Ready`,
+then applies the manifests to create the apps and Ingress.
 
 ```
 p2/
@@ -114,8 +133,14 @@ p2/
 ```bash
 cd p2
 vagrant up
+```
+
+Enter the VM and check the resources and routes. The `curl` commands set
+the HTTP `Host` header so the Ingress can choose the matching app; a request
+without an explicit Host header is routed to app3.
+
+```bash
 vagrant ssh hguoS
-# inside the VM:
 kubectl get all
 curl -H "Host: app1.com" 192.168.56.110
 curl -H "Host: app2.com" 192.168.56.110
@@ -124,10 +149,20 @@ curl 192.168.56.110
 kubectl get ingress
 kubectl describe ingress
 
-# Check the workloads and routing resources if a request does not respond.
+# Inspect these resources if a request does not return the expected page.
 kubectl get deployments,pods,services,ingress
+exit
+```
 
+Run Vagrant lifecycle commands from the host, in `p2/`:
+
+```bash
 vagrant halt
+```
+
+To remove the VM and its data, run this from the host in `p2/`:
+
+```bash
 vagrant destroy -f
 ```
 
